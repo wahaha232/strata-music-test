@@ -1,0 +1,298 @@
+STRATA LOCAL AI CODING ENVIRONMENT - INSTALLATION REPORT
+=========================================================
+Report time : 2026-11-09 (local)
+BUILD STATUS: COMPLETE - the model is loaded and the OpenAI-compatible API works.
+PERFORMANCE  : Very slow (about 0.2-0.5 tokens/s for short answers) because only
+               about 1-4 GB of the 32 GB RAM is free and the 23.4 GB expert pack
+               is read from a USB HDD at about 17-27 MB/s. Folding@home is paused
+               while Strata runs so the GPU is available. Correctness was
+               verified; long agentic outputs take a long time.
+
+
+1. STRATA VERSION AND OFFICIAL SOURCE
+-------------------------------------
+- Product      : Strata (Niko1221/Strata)
+- Version      : 0.2.12 (terminal build 0.1.58)
+- License      : MIT
+- Official repo: https://github.com/Niko1221/Strata
+- Release      : https://github.com/Niko1221/Strata/releases/tag/v0.2.12
+- Docs used    : docs/INSTALL.md, docs/MODELS.md, docs/TERMINAL_LAUNCH.md
+- Engine       : 0.1.58 windows-x86_64-cuda-cuda13 (installed and verified)
+- Terminal     : G:\Strata\App\terminal\0.1.58
+- Bundled Python: G:\Strata\App\terminal\current\python\python.exe (3.12.15)
+
+
+2. MODEL
+--------
+- Name         : Qwen3.8-Flash-Next Coder IQ1_M
+- Official repo: https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF
+- Pinned commit: 5348543e0147355ac9cbcb031184a3546350988e
+- Quantization : GSQ-RCO Coder IQ1_M (256 of 512 experts kept, about 1.89 bpw)
+- Total size   : 58.4 GB (54.40 GiB shown by Windows)
+  * Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf
+    29,608,446,496 bytes, SHA-256 e11083ba855e7666b48ea3f2db6a9c3a20c18751a012cc24f948de91b7087fad
+  * Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00002-of-00002.gguf
+    28,800,138,432 bytes, SHA-256 316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113
+  * mmproj-Qwen3.8-Flash-Next-BF16.gguf: NOT downloaded (vision is off; optional)
+- Prepared pack: G:\Strata\Models\packs\coder-iq1_m (experts.bin 23.42 GB + dense.bin 1.37 GB)
+- Native model location: G:\Strata\Models\models\coder-IQ1_M
+- Native architecture: 125B total / 6B active + 51B n-gram embedding, 48 layers,
+  512 experts (10 routed + 1 shared), native context 262,144.
+
+The two shard sizes and SHA-256 values were verified by Strata setup; both .done
+marks contain the pinned hashes. The model is used through Strata's low-memory
+(native pack + expert cache) mode.
+
+
+3. HARDWARE AND RESOURCE USE
+----------------------------
+- OS         : Windows 10 Pro 10.0.19045
+- CPU        : Intel Core i7-6700 (4C/8T)
+- GPU        : NVIDIA GeForce RTX 3060, 12,288 MiB, driver 610.88, CUDA UMD 13.3
+- GPU during inference: about 11.7-11.9 GB used, about 0.2-0.4 GB free.
+  Strata pauses Folding@home's GPU group before the model starts (FAH v8
+  WebSocket 127.0.0.1:7396) and resumes it when Strata stops. FAH is PAUSED
+  while the API is serving, so the engine has the full VRAM for experts.
+- RAM        : 31.94 GB total; about 0.8-4 GB free while the model is loaded
+  (0.77 GB observed at steady state). The Strata engine uses about 9.5-10 GB.
+- G: volume  : 443.23 GB NTFS, about 287 GB free after installation.
+- G: media   : ADATA NH13 USB external HDD, write ~27 MB/s, read ~17-27 MB/s.
+- Runtime    : 32,768-token context, KV int8, parallel 1, vision off, MTP off.
+
+
+4. MODEL LOAD TIME
+------------------
+- First-time model preparation (one time):
+  * SHA-256 verification of 58.4 GB: about 1 hour on the USB HDD.
+  * Expert pack conversion: about 39 minutes (25 GB written).
+- Model load after the pack exists: about 10-15 minutes (about 600-800 seconds
+  before the API reported "loaded"; the runtime start was given 1800 s and the
+  server's engine_ready_s was raised from the 900 s default to 3600 s).
+- A plain `strata launch --no-tui` stops itself after its automatic ~13-minute
+  start wait on this slow disk; the working service is therefore started with
+  `strata runtime start --profile launch-iq1_m-32k --wait 1800`.
+
+
+5. API
+------
+- Base URL : http://127.0.0.1:8081/v1
+- Model ID : qwen3.8-flash-next-coder-iq1_m
+- API key  : none (localhost only)
+- Endpoints verified: GET /v1/models, POST /v1/chat/completions (non-streaming
+  and streaming SSE with data: [DONE]), multi-turn messages.
+- Thinking is disabled by default in the run config (reasoning_effort = none)
+  so clients such as Kilo get normal content instead of an empty answer. To
+  enable thinking for a request:
+    "chat_template_kwargs": {"enable_thinking": true}
+  (expect much longer response times on this machine).
+- GPU policy: Start-Strata pauses Folding@home (FAH v8) before the model loads;
+  Stop-Strata resumes it after the API is stopped. The user's
+  AI monitoring panel .bat in D:\VS CODE\PROJECT / ai_proxy_daemon.py targets
+  llama-server on 8080 -> 8081; it was NOT run as a proxy because Strata owns
+  8081. Its FAH v8 pause/resume logic was reimplemented in
+  G:\Strata\Scripts\Fah-Control.ps1 so the GPU can be shared safely.
+
+
+6. CODING TEST RESULTS (actual runs)
+------------------------------------
+1. Python generation ("add(a,b)"): PASS.
+   Output: ```python def add(a, b): return a + b```; 18 tokens, 214.7 s
+   (153.8 s with Folding@home paused; about 0.2 tokens/s).
+2. C# generation (MathUtil.Add): PASS.
+   38 tokens, 136 s; correct public static class/method.
+3. Python debugging (average of empty list): PASS.
+   Fixed with an `if not xs: return 0.0` guard; 33 tokens, 174.8 s.
+4. Multi-file understanding (models.py/app.py wrong import): PASS.
+   Correctly identified `Users` vs `User` in app.py; 45 tokens, 285.5 s.
+5. Modify existing Python code (list comprehension to for loop): PASS.
+   36 tokens, 133.5 s; correct result list and loop.
+6. Multi-turn conversation (square -> cube): PASS.
+   Turn 1: 16 tokens, 31.5 s; Turn 2: 19 tokens, 125.5 s; kept context.
+7. Streaming: PASS.
+   HTTP 200, SSE chunks delivered one token at a time, final [DONE];
+   13 tokens, 64.6 s; 0.5 tokens/s in that run.
+8. Simple API check ("STRATA_OK"): PASS, 4 tokens, 116.9 s without FAH pause;
+   70.2 s with Folding@home paused.
+- Speed range observed: about 0.16-0.5 generated tokens/s (prefill 0.3-0.8
+  tokens/s); with FAH paused about 0.2-0.3 generated and 0.4 prefill. Pausing
+  FAH improved the same requests by roughly 25-30%. This is still a memory/disk
+  limitation, not a model error.
+- Long-context stress test: NOT completed. The context is configured and
+  accepted at 32,768 tokens, but prefill at 0.3-0.8 tokens/s makes a many-
+  thousand-token prompt take hours on this USB HDD. Multi-turn (short context)
+  was verified.
+
+
+6A. MUSIC GENERATION TEST (2026-11-09)
+--------------------------------------
+- Prompt: write a self-contained, standard-library-only Python synthesizer for
+  exactly 120 seconds of ambient music.
+- The model produced a 46-line script. The response reached the 600-token cap,
+  so the final `wave.writeframes` line was completed manually; the rest of the
+  synthesizer is the model's output.
+- The script ran with the bundled Python 3.12 in 13.2 seconds.
+- WAV: G:\Strata\Tests\music_2min.wav (5.05 MiB, 22050 Hz, 16-bit mono, 2:00).
+- MP3: G:\Strata\Tests\music_2min.mp3 (2.75 MiB, 192 kbps, 44.1 kHz mono, 2:00).
+- Volume check: mean -12.8 dB, max -5.5 dB (audible, not silent, not clipped).
+- GitHub repository: https://github.com/wahaha232/strata-music-test
+- Direct download:
+  https://raw.githubusercontent.com/wahaha232/strata-music-test/main/music_2min.mp3
+- Uploaded SHA-256:
+  776697B556492C8AD248CB822FCB448B835D317E6E8453C03A134353524285E9
+- Model generation time: about 17 minutes (600 tokens at about 0.8 tokens/s
+  after the prompt prefill).
+- Note: this Strata model is text/code-only; it cannot emit audio directly. The
+  music was produced by executing the Python synthesizer it wrote.
+
+
+7. ONE-CLICK SCRIPTS (tested)
+-----------------------------
+- G:\Strata\Scripts\Start-Strata.bat
+  Checks G:, checks the two model shards, reuses a running API, otherwise starts
+  the Strata runtime in a minimized background window and prints the API URL.
+  The runtime start pauses Folding@home first. Tested: FAH pause confirmed, then
+  the runtime and API reached "loaded".
+- G:\Strata\Scripts\Stop-Strata.bat
+  Tries `strata runtime stop`; if the API is still up, terminates the Strata
+  runtime/server/engine process tree, then resumes Folding@home (only if Strata
+  paused it). Tested: API stopped, FAH resumed to ACTIVE, GPU dropped to about
+  1.7 GB, VRAM released.
+- G:\Strata\Scripts\Check-Strata.bat
+  Shows GPU, RAM, G: free space, model files, FAH version/group/VRAM state,
+  runtime status, API model ID and Strata processes. Tested: shows the loaded
+  model, API and FAH PAUSED.
+- G:\Strata\Scripts\Runtime-Start.ps1
+  Sets the isolated environment, pauses Folding@home via Fah-Control.ps1, then
+  runs `strata runtime start --profile launch-iq1_m-32k --wait 1800`. If the
+  start fails, it resumes FAH.
+- G:\Strata\Scripts\Fah-Control.ps1
+  Standalone FAH v8 control (WebSocket 127.0.0.1:7396):
+    -Action Status  (read-only)
+    -Action Pause   (pauses the GPU group, records it in
+                     G:\Strata\Config\fah-paused.json)
+    -Action Resume  (resumes only the groups Strata paused)
+  Tested: Pause confirmed (FahCore exits), Resume confirmed (group ACTIVE).
+- G:\Strata\Scripts\Setup-Strata.ps1
+  First-time verification/preparation launcher (already used).
+- G:\Strata\Scripts\Prefetch-StrataModel.ps1 + prefetch_model.py
+  Optional authenticated Hugging Face prefetch helper (not needed now).
+
+
+8. ENVIRONMENT VARIABLES (process-scoped; no global Windows change)
+-------------------------------------------------------------------
+STRATA_DATA_DIR       = G:\Strata\App
+STRATA_COMPONENTS_DIR = G:\Strata\Runtime
+STRATA_HOME           = G:\Strata\Config\Home
+STRATA_RUNTIME_DIR    = G:\Strata\Runtime\State
+STRATA_STATE_DIR      = G:\Strata\Config\State
+STRATA_DOCUMENTS_DIR  = G:\Strata\Models
+APPDATA               = G:\Strata\Config\AppData\Roaming
+LOCALAPPDATA          = G:\Strata\Config\AppData\Local
+TEMP                  = G:\Strata\Temp
+TMP                   = G:\Strata\Temp
+HF_HOME               = G:\Strata\Cache\HuggingFace
+HF_HUB_CACHE          = G:\Strata\Cache\HuggingFace\hub
+TRANSFORMERS_CACHE    = G:\Strata\Cache\Transformers
+TORCH_HOME            = G:\Strata\Cache\Torch
+PIP_CACHE_DIR         = G:\Strata\Cache\Pip
+
+Windows PATH was not modified (STRATA_NO_PATH=1 during installation).
+
+
+9. INSTALLATION AND DOWNLOAD PATHS
+----------------------------------
+- Strata app/terminal       : G:\Strata\App
+- Strata install metadata   : G:\Strata\install (stable run config
+                              strata-coder-iq1_m.json, engine log)
+- Engine components         : G:\Strata\Runtime
+- Models                    : G:\Strata\Models\models\coder-IQ1_M
+- Prepared pack             : G:\Strata\Models\packs\coder-iq1_m
+- Config/state              : G:\Strata\Config
+- FAH control/state         : G:\Strata\Scripts\Fah-Control.ps1 and
+                              G:\Strata\Config\fah-paused.json
+- Hugging Face/Pip caches   : G:\Strata\Cache
+- Temp                      : G:\Strata\Temp
+- Logs                      : G:\Strata\Logs
+- Tests                     : G:\Strata\Tests
+- Model download (FDM)      : the final .gguf files are in G:\Strata\Models;
+                              no model was downloaded to C: or D:.
+
+
+10. DISK-ISOLATION CHECK
+------------------------
+Final scan found no Strata files in:
+  C:\Users\wahah\AppData\Local\Strata        (False)
+  C:\Users\wahah\AppData\Roaming\Strata      (False)
+  C:\Users\wahah\.strata                     (False)
+  C:\Users\wahah\Documents\Strata            (False)
+  C:\Users\wahah\Downloads\Strata            (False)
+  C:\Users\wahah\AppData\Local\Temp\strata-install (False)
+- During the first update check (before overrides were found), Strata briefly
+  created C:\Users\wahah\AppData\Local\Strata (about 471 bytes). It was created
+  by this task, confirmed, and removed.
+- The optional Hugging Face Xet speed probe briefly created
+  C:\Users\wahah\.cache\huggingface (about 106 KB); it was created by this task,
+  confirmed, and removed.
+- The installer's temporary work directory was redirected to G:\Strata\Temp
+  (GetTempPath resolved there) before installation.
+- No Strata file was installed or downloaded to D: or another drive.
+- The FDM Portable application itself is a pre-existing user tool on the C:
+  Desktop; it is not a Strata file. Its .fdmdownload temp files were written
+  directly to G:\Strata\Models\models\coder-IQ1_M and became the final .gguf.
+- Existing Kilo, VS Code, NVIDIA and Windows system files were not moved or
+  reinstalled.
+
+
+11. UNRESOLVED ISSUES / LIMITATIONS
+-----------------------------------
+1. Speed is very low: about 0.2-0.5 tokens/s, because the model's 23.4 GB expert
+   pack does not fit in the ~0.8-4 GB of free RAM and is read from the USB HDD.
+   Short answers take 1-5 minutes. Long agentic coding sessions are impractical.
+2. Free RAM is very low (about 0.8 GB observed at steady state) because many
+   desktop applications are running. Closing memory-heavy applications would
+   let the expert cache grow in RAM and improve speed.
+3. Folding@home is intentionally paused while Strata runs so the engine can use
+   the full VRAM (about 11.7-11.9 GB). Folding resumes when Stop-Strata.bat is
+   used. If FAH must run concurrently, start Strata without the Start script;
+   expect less VRAM for experts and slower answers.
+4. The USB HDD reads at about 17-27 MB/s. A faster SSD/USB 3.2 connection would
+   improve model loading and expert-cache misses substantially.
+5. Long-context stress testing was not practical (32K is configured and
+   accepted; prefill would take hours for very long prompts).
+6. Thinking is off by default for client compatibility; enabling it is much
+   slower on this machine.
+7. `strata runtime status --profile launch-iq1_m-32k` can occasionally report
+   "starting" while the API is already loaded; Check-Strata.bat therefore also
+   checks GET /v1/models and the process list. The API itself is healthy (it
+   showed "ready" in the final check).
+
+These are performance limitations, not build failures. The model, GPU offload,
+API, streaming and coding behavior were verified.
+
+
+12. ACCEPTANCE CHECKLIST
+------------------------
+[x] Strata is installed and running.
+[x] The model loads (Qwen3.8-Flash-Next Coder IQ1_M).
+[x] The RTX 3060 participates (about 11.7-11.9 GB VRAM used; engine uses CUDA).
+[x] The OpenAI-compatible API works (http://127.0.0.1:8081/v1, model id above).
+[x] Kilo / VS Code can connect: standard OpenAI /v1/chat/completions with SSE
+    streaming was verified; use any placeholder API key.
+[x] One-click start and stop work and were tested.
+[x] GPU resource control: Start pauses Folding@home (FAH v8) and Stop resumes
+    it; Fah-Control.ps1 can also Pause/Resume/Status manually. Tested both
+    directions with confirmed FAH states.
+[x] Stop releases VRAM and the API port and restores Folding@home.
+[x] Music generation test: model-written Python synthesizer produced a 2:00
+    MP3 at G:\Strata\Tests\music_2min.mp3.
+[x] All new Strata files are under G:\Strata (final scan: yes).
+[x] No Strata files on C:, D: or other drives (final scan: yes; transient C:
+    state/cache from installation/probing was removed).
+[ ] Long-context stress test complete: not practical on this HDD; 32K context
+    is configured and accepted (not a functional failure).
+
+OVERALL: The environment is built and usable. Correct coding answers, streaming
+and multi-turn behavior were verified. The main caveat is severe slowness from
+32 GB RAM pressure and the USB HDD; it is not suitable for long autonomous
+coding sessions until more RAM or a faster SSD is available.
+
