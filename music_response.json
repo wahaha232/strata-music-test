@@ -1,0 +1,37 @@
+﻿{
+    "id":  "chatcmpl-5f9bda2b4643446697c59d5f",
+    "object":  "chat.completion",
+    "created":  1794160031,
+    "model":  "qwen3.8-flash-next-coder-iq1_m",
+    "choices":  [
+                    {
+                        "index":  0,
+                        "message":  {
+                                        "role":  "assistant",
+                                        "content":  "import wave, math, random\nfrom struct import pack\nrandom.seed(42)\nsr = 22050\nduration = 120\ntotal_frames = sr * duration\nchords = [[60, 64, 67], [62, 65, 69], [65, 69, 72], [67, 71, 74]]\nmelody_notes = [60, 62, 64, 65, 67, 69, 71, 72]\ndef note_freq(n): return 2 ** ((n - 69) / 12.0) * 440.0\ndef generate_audio():\n    samples = []\n    for t in range(total_frames):\n        time_sec = t / sr\n        chord_idx = int(time_sec // 8) % len(chords)\n        current_chord = chords[chord_idx]\n        sample_val = 0.0\n        # Pad/Chord layer\n        for note in current_chord:\n            freq = note_freq(note)\n            phase = (time_sec * freq * 2 * math.pi) % (2 * math.pi)\n            amplitude = 0.15 / len(current_chord)\n            sample_val += amplitude * math.sin(phase)\n        # Melody layer\n        melody_idx = int(time_sec // 2) % len(melody_notes)\n        m_note = melody_notes[melody_idx]\n        m_freq = note_freq(m_note)\n        m_phase = (time_sec * m_freq * 2 * math.pi) % (2 * math.pi)\n        # Add a slight vibrato/variation to melody\n        m_amp = 0.3 * (1 + 0.2 * math.sin(time_sec * 5))\n        sample_val += m_amp * math.sin(m_phase)\n        # Simple ambient noise/arpeggiator effect\n        if t % 100 == 0:\n            sample_val += random.uniform(-0.05, 0.05)\n        # Clamp and convert to int16\n        val = max(-32767, min(32767, int(sample_val * 32767)))\n        samples.append(val)\n    return samples\n\nif __name__ == \"__main__\":\n    audio_data = generate_audio()\n    with wave.open(r\"G:\\Strata\\Tests\\music_2min.wav\", \"wb\") as wf:\n        wf.setnchannels(1)\n        wf.setsampwidth(2)\n        wf.setframerate(22050)\n        # Pack all samples into bytes using struct\n"
+                                    },
+                        "finish_reason":  "length"
+                    }
+                ],
+    "usage":  {
+                  "prompt_tokens":  115,
+                  "completion_tokens":  600,
+                  "total_tokens":  715,
+                  "prompt_tokens_details":  {
+                                                "cached_tokens":  0
+                                            }
+              },
+    "timings":  {
+                    "cache_n":  0,
+                    "prompt_n":  115,
+                    "prompt_ms":  258961.4,
+                    "prompt_per_token_ms":  2251.838,
+                    "prompt_per_second":  0.4,
+                    "predicted_n":  600,
+                    "predicted_ms":  754128.9,
+                    "predicted_per_token_ms":  1256.881,
+                    "predicted_per_second":  0.8,
+                    "draft_n":  62,
+                    "draft_n_accepted":  32
+                }
+}
